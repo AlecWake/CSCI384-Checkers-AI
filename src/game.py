@@ -24,6 +24,11 @@ def create_board():
     return board
 
 
+# Make a separate copy of the board
+def copy_board(board):
+    return [row[:] for row in board]
+
+
 # Print the board with row and column numbers
 def print_board(board):
     print()
@@ -124,10 +129,10 @@ def get_capture_moves(board, row, col, player):
         end_row = row + (row_change * 2)
         end_col = col + (col_change * 2)
 
-        if not is_on_board(end_row, end_col):
+        if not is_on_board(middle_row, middle_col):
             continue
 
-        if not is_on_board(middle_row, middle_col):
+        if not is_on_board(end_row, end_col):
             continue
 
         middle_piece = board[middle_row][middle_col]
@@ -173,15 +178,23 @@ def get_legal_moves(board, row, col, player):
     return moves
 
 
-# Check whether the player has any legal move
-def player_has_legal_move(board, player):
+# Get every legal move for a player
+def get_all_legal_moves(board, player):
+    all_moves = []
+
     for row in range(BOARD_SIZE):
         for col in range(BOARD_SIZE):
             if belongs_to_player(board[row][col], player):
-                if get_legal_moves(board, row, col, player):
-                    return True
+                moves = get_legal_moves(board, row, col, player)
 
-    return False
+                for move in moves:
+                    all_moves.append((row, col, move))
+
+    return all_moves
+
+
+def player_has_legal_move(board, player):
+    return len(get_all_legal_moves(board, player)) > 0
 
 
 def count_pieces(board, player):
@@ -212,6 +225,20 @@ def make_move(board, start_row, start_col, move):
     return end_row, end_col, captured_row is not None, promoted
 
 
+# Apply a move without changing the original board
+def make_move_on_copy(board, start_row, start_col, move):
+    new_board = copy_board(board)
+
+    make_move(
+        new_board,
+        start_row,
+        start_col,
+        move
+    )
+
+    return new_board
+
+
 # Turn a normal piece into a king
 def promote_piece(board, row, col):
     piece = board[row][col]
@@ -232,6 +259,33 @@ def switch_player(player):
         return "black"
 
     return "red"
+
+
+# Return the winner if the current player cannot continue
+def get_winner(board, current_player):
+    if count_pieces(board, "red") == 0:
+        return "black"
+
+    if count_pieces(board, "black") == 0:
+        return "red"
+
+    if not player_has_legal_move(board, current_player):
+        return switch_player(current_player)
+
+    return None
+
+
+# Utility value for terminal states
+def get_utility(board, max_player, current_player):
+    winner = get_winner(board, current_player)
+
+    if winner is None:
+        return 0
+
+    if winner == max_player:
+        return 1
+
+    return -1
 
 
 def read_move():
@@ -272,15 +326,9 @@ def main():
     print("Rows and columns are numbered 0 through 7.")
 
     while True:
-        # Check whether the current player has lost
-        if count_pieces(board, current_player) == 0:
-            winner = switch_player(current_player)
-            print_board(board)
-            print(winner.capitalize() + " wins!")
-            break
+        winner = get_winner(board, current_player)
 
-        if not player_has_legal_move(board, current_player):
-            winner = switch_player(current_player)
+        if winner is not None:
             print_board(board)
             print(winner.capitalize() + " wins!")
             break
@@ -317,7 +365,7 @@ def main():
             print("Invalid move.")
             continue
 
-        # During a multi-jump the same piece must move again
+        # During a multi-jump the same piece must continue
         if forced_piece is not None:
             if (start_row, start_col) != forced_piece:
                 print("You must continue the jump with the same piece.")
@@ -354,7 +402,7 @@ def main():
             selected_move
         )
 
-        # Continue jumping if another capture is available
+        # Keep the turn if another jump is available
         if was_capture and not promoted:
             more_captures = get_capture_moves(
                 board,
