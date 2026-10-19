@@ -2,46 +2,50 @@ from src.game import (
     create_board,
     copy_board,
     get_all_legal_moves,
-    make_move_on_copy,
+    get_all_legal_turns,
+    apply_turn,
     count_pieces,
     promote_piece,
     get_winner,
     get_utility,
     EMPTY,
     RED,
+    RED_KING,
     BLACK
 )
+
+
+def empty_board():
+    return [[EMPTY for _ in range(8)] for _ in range(8)]
 
 
 def test_starting_board():
     board = create_board()
 
-    print("Red pieces:", count_pieces(board, "red"))
-    print("Black pieces:", count_pieces(board, "black"))
-    print("Red legal moves:", len(get_all_legal_moves(board, "red")))
-    print("Black legal moves:", len(get_all_legal_moves(board, "black")))
+    assert count_pieces(board, "red") == 12
+    assert count_pieces(board, "black") == 12
+
+    assert len(get_all_legal_moves(board, "red")) == 7
+    assert len(get_all_legal_moves(board, "black")) == 7
+
+    print("Starting board test: PASS")
 
 
 def test_board_copy():
     board = create_board()
     original = copy_board(board)
 
-    moves = get_all_legal_moves(board, "red")
-    start_row, start_col, move = moves[0]
+    turns = get_all_legal_turns(board, "red")
+    new_board = apply_turn(board, turns[0])
 
-    new_board = make_move_on_copy(
-        board,
-        start_row,
-        start_col,
-        move
-    )
+    assert board == original
+    assert new_board != board
 
-    print("Original board unchanged:", board == original)
-    print("Copied board changed:", new_board != board)
+    print("Board copy test: PASS")
 
 
 def test_promotion():
-    board = [[EMPTY for _ in range(8)] for _ in range(8)]
+    board = empty_board()
 
     board[1][2] = RED
     board[0][3] = board[1][2]
@@ -49,27 +53,117 @@ def test_promotion():
 
     promote_piece(board, 0, 3)
 
-    print("Promoted piece:", board[0][3])
+    assert board[0][3] == RED_KING
+
+    print("Promotion test: PASS")
 
 
 def test_winner():
-    board = [[EMPTY for _ in range(8)] for _ in range(8)]
+    board = empty_board()
 
     board[0][1] = RED
     board[6][1] = BLACK
 
-    print("Winner if red turn:", get_winner(board, "red"))
-    print("Winner if black turn:", get_winner(board, "black"))
-    print("Utility for black:", get_utility(board, "black", "red"))
+    assert get_winner(board, "red") == "black"
+    assert get_winner(board, "black") is None
+    assert get_utility(board, "black", "red") == 1
+
+    print("Winner test: PASS")
 
 
-test_starting_board()
-print()
+def test_forced_capture():
+    board = empty_board()
 
-test_board_copy()
-print()
+    board[5][0] = RED
+    board[5][4] = RED
+    board[4][1] = BLACK
 
-test_promotion()
-print()
+    turns = get_all_legal_turns(board, "red")
 
-test_winner()
+    assert len(turns) == 1
+    assert turns[0] == [(5, 0), (3, 2)]
+
+    print("Forced capture test: PASS")
+
+
+def test_multi_jump():
+    board = empty_board()
+
+    board[5][0] = RED
+    board[4][1] = BLACK
+    board[2][3] = BLACK
+
+    turns = get_all_legal_turns(board, "red")
+
+    expected_turn = [
+        (5, 0),
+        (3, 2),
+        (1, 4)
+    ]
+
+    assert expected_turn in turns
+
+    new_board = apply_turn(board, expected_turn)
+
+    assert new_board[1][4] == RED
+    assert new_board[4][1] == EMPTY
+    assert new_board[2][3] == EMPTY
+    assert board[5][0] == RED
+
+    print("Multi-jump test: PASS")
+
+
+def test_king_backward_move():
+    board = empty_board()
+
+    board[3][2] = RED_KING
+
+    turns = get_all_legal_turns(board, "red")
+
+    assert [(3, 2), (4, 1)] in turns
+    assert [(3, 2), (4, 3)] in turns
+    assert [(3, 2), (2, 1)] in turns
+    assert [(3, 2), (2, 3)] in turns
+
+    print("King movement test: PASS")
+
+
+def test_promotion_ends_jump():
+    board = empty_board()
+
+    board[2][1] = RED
+    board[1][2] = BLACK
+    board[1][4] = BLACK
+
+    turns = get_all_legal_turns(board, "red")
+
+    assert [(2, 1), (0, 3)] in turns
+
+    new_board = apply_turn(
+        board,
+        [(2, 1), (0, 3)]
+    )
+
+    assert new_board[0][3] == RED_KING
+    assert new_board[1][2] == EMPTY
+    assert new_board[1][4] == BLACK
+
+    print("Promotion capture test: PASS")
+
+
+def run_tests():
+    test_starting_board()
+    test_board_copy()
+    test_promotion()
+    test_winner()
+    test_forced_capture()
+    test_multi_jump()
+    test_king_backward_move()
+    test_promotion_ends_jump()
+
+    print()
+    print("All tests passed.")
+
+
+if __name__ == "__main__":
+    run_tests()
