@@ -24,12 +24,10 @@ def create_board():
     return board
 
 
-# Make a separate copy of the board
 def copy_board(board):
     return [row[:] for row in board]
 
 
-# Print the board with row and column numbers
 def print_board(board):
     print()
     print("   0 1 2 3 4 5 6 7")
@@ -68,7 +66,6 @@ def belongs_to_opponent(piece, player):
     return False
 
 
-# Get the directions a piece can move
 def get_directions(piece):
     if piece == RED:
         return [(-1, -1), (-1, 1)]
@@ -87,7 +84,7 @@ def get_directions(piece):
     return []
 
 
-# Find normal one-square moves
+# Find normal moves for one piece
 def get_simple_moves(board, row, col, player):
     moves = []
 
@@ -110,7 +107,7 @@ def get_simple_moves(board, row, col, player):
     return moves
 
 
-# Find captures available for one piece
+# Find one-jump captures for a piece
 def get_capture_moves(board, row, col, player):
     captures = []
 
@@ -146,7 +143,6 @@ def get_capture_moves(board, row, col, player):
     return captures
 
 
-# Check if the player has any capture on the board
 def player_has_capture(board, player):
     for row in range(BOARD_SIZE):
         for col in range(BOARD_SIZE):
@@ -157,7 +153,7 @@ def player_has_capture(board, player):
     return False
 
 
-# Get legal moves for one selected piece
+# Legal one-step moves used by the CLI
 def get_legal_moves(board, row, col, player):
     if not is_on_board(row, col):
         return []
@@ -178,7 +174,6 @@ def get_legal_moves(board, row, col, player):
     return moves
 
 
-# Get every legal move for a player
 def get_all_legal_moves(board, player):
     all_moves = []
 
@@ -193,10 +188,6 @@ def get_all_legal_moves(board, player):
     return all_moves
 
 
-def player_has_legal_move(board, player):
-    return len(get_all_legal_moves(board, player)) > 0
-
-
 def count_pieces(board, player):
     count = 0
 
@@ -208,7 +199,21 @@ def count_pieces(board, player):
     return count
 
 
-# Move a piece and remove a captured piece if needed
+def promote_piece(board, row, col):
+    piece = board[row][col]
+
+    if piece == RED and row == 0:
+        board[row][col] = RED_KING
+        return True
+
+    if piece == BLACK and row == BOARD_SIZE - 1:
+        board[row][col] = BLACK_KING
+        return True
+
+    return False
+
+
+# Apply one move
 def make_move(board, start_row, start_col, move):
     end_row, end_col, captured_row, captured_col = move
 
@@ -225,7 +230,6 @@ def make_move(board, start_row, start_col, move):
     return end_row, end_col, captured_row is not None, promoted
 
 
-# Apply a move without changing the original board
 def make_move_on_copy(board, start_row, start_col, move):
     new_board = copy_board(board)
 
@@ -239,19 +243,136 @@ def make_move_on_copy(board, start_row, start_col, move):
     return new_board
 
 
-# Turn a normal piece into a king
-def promote_piece(board, row, col):
-    piece = board[row][col]
+# Find every complete capture sequence for one piece
+def get_capture_sequences(board, row, col, player, path=None):
+    if path is None:
+        path = [(row, col)]
 
-    if piece == RED and row == 0:
-        board[row][col] = RED_KING
-        return True
+    captures = get_capture_moves(board, row, col, player)
 
-    if piece == BLACK and row == BOARD_SIZE - 1:
-        board[row][col] = BLACK_KING
-        return True
+    if not captures:
+        if len(path) > 1:
+            return [path]
 
-    return False
+        return []
+
+    sequences = []
+
+    for move in captures:
+        new_board = copy_board(board)
+
+        new_row, new_col, was_capture, promoted = make_move(
+            new_board,
+            row,
+            col,
+            move
+        )
+
+        new_path = path + [(new_row, new_col)]
+
+        # A piece that becomes a king ends its turn
+        if promoted:
+            sequences.append(new_path)
+            continue
+
+        more_sequences = get_capture_sequences(
+            new_board,
+            new_row,
+            new_col,
+            player,
+            new_path
+        )
+
+        if more_sequences:
+            sequences.extend(more_sequences)
+        else:
+            sequences.append(new_path)
+
+    return sequences
+
+
+# Get every complete legal turn for the AI
+def get_all_legal_turns(board, player):
+    turns = []
+
+    if player_has_capture(board, player):
+        for row in range(BOARD_SIZE):
+            for col in range(BOARD_SIZE):
+                if belongs_to_player(board[row][col], player):
+                    sequences = get_capture_sequences(
+                        board,
+                        row,
+                        col,
+                        player
+                    )
+
+                    turns.extend(sequences)
+
+        return turns
+
+    for row in range(BOARD_SIZE):
+        for col in range(BOARD_SIZE):
+            if belongs_to_player(board[row][col], player):
+                simple_moves = get_simple_moves(
+                    board,
+                    row,
+                    col,
+                    player
+                )
+
+                for end_row, end_col in simple_moves:
+                    turns.append(
+                        [(row, col), (end_row, end_col)]
+                    )
+
+    return turns
+
+
+# Apply an entire AI turn to a copied board
+def apply_turn(board, turn):
+    new_board = copy_board(board)
+
+    if len(turn) < 2:
+        return new_board
+
+    current_row, current_col = turn[0]
+
+    for next_row, next_col in turn[1:]:
+        row_change = next_row - current_row
+        col_change = next_col - current_col
+
+        captured_row = None
+        captured_col = None
+
+        if abs(row_change) == 2 and abs(col_change) == 2:
+            captured_row = (current_row + next_row) // 2
+            captured_col = (current_col + next_col) // 2
+
+        move = (
+            next_row,
+            next_col,
+            captured_row,
+            captured_col
+        )
+
+        new_row, new_col, was_capture, promoted = make_move(
+            new_board,
+            current_row,
+            current_col,
+            move
+        )
+
+        current_row = new_row
+        current_col = new_col
+
+        if promoted:
+            break
+
+    return new_board
+
+
+def player_has_legal_move(board, player):
+    return len(get_all_legal_turns(board, player)) > 0
 
 
 def switch_player(player):
@@ -261,7 +382,6 @@ def switch_player(player):
     return "red"
 
 
-# Return the winner if the current player cannot continue
 def get_winner(board, current_player):
     if count_pieces(board, "red") == 0:
         return "black"
@@ -275,7 +395,6 @@ def get_winner(board, current_player):
     return None
 
 
-# Utility value for terminal states
 def get_utility(board, max_player, current_player):
     winner = get_winner(board, current_player)
 
@@ -308,7 +427,6 @@ def read_move():
         return None
 
 
-# Find a move that matches the user's coordinates
 def find_move(legal_moves, end_row, end_col):
     for move in legal_moves:
         if move[0] == end_row and move[1] == end_col:
@@ -342,6 +460,7 @@ def main():
                 forced_piece[0],
                 forced_piece[1]
             )
+
         elif player_has_capture(board, current_player):
             print("A capture is required.")
 
@@ -365,7 +484,6 @@ def main():
             print("Invalid move.")
             continue
 
-        # During a multi-jump the same piece must continue
         if forced_piece is not None:
             if (start_row, start_col) != forced_piece:
                 print("You must continue the jump with the same piece.")
@@ -377,6 +495,7 @@ def main():
                 start_col,
                 current_player
             )
+
         else:
             legal_moves = get_legal_moves(
                 board,
@@ -402,7 +521,6 @@ def main():
             selected_move
         )
 
-        # Keep the turn if another jump is available
         if was_capture and not promoted:
             more_captures = get_capture_moves(
                 board,
