@@ -1,22 +1,11 @@
 import time
+from src.heuristic import evaluate_board
 from src.game import (
     get_all_legal_turns,
     apply_turn,
     get_winner,
     switch_player
 )
-
-def simple_piece_count_heuristic(board, player):
-    # Base heuristic checking piece balance
-    score = 0
-    opponent = switch_player(player)
-    for row in board:
-        for cell in row:
-            if cell.lower() == player[0]:
-                score += 2 if cell.isupper() else 1
-            elif cell.lower() == opponent[0]:
-                score -= 2 if cell.isupper() else 1
-    return score
 
 class MinimaxAgent:
     def __init__(self, max_depth=3):
@@ -36,7 +25,7 @@ class MinimaxAgent:
 
         # Depth limit cutoff
         if depth == 0:
-            return simple_piece_count_heuristic(board, max_player), None
+            return evaluate_board(board, max_player), None
 
         legal_turns = get_all_legal_turns(board, current_player)
         # Terminal state check for no legal moves (stalemate/loss)
