@@ -1,0 +1,7 @@
+State,Algorithm,Depth,Chosen move,Value,Nodes evaluated,Pruned branches,Time (s)
+State 1 (opening),Minimax,3,"(5,4)->(4,5)",1.5,359,0,0.0608
+State 1 (opening),Alpha-Beta,3,"(5,4)->(4,5)",1.5,179,25,0.0263
+State 2 (midgame),Minimax,3,"(4,1)->(3,0)",1.9,226,0,0.0272
+State 2 (midgame),Alpha-Beta,3,"(4,1)->(3,0)",1.9,109,15,0.0132
+State 3 (endgame),Minimax,3,"(4,5)->(3,4)",0.2,127,0,0.0113
+State 3 (endgame),Alpha-Beta,3,"(4,5)->(3,4)",0.2,54,8,0.0046
