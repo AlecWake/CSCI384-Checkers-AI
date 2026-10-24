@@ -7,17 +7,30 @@ from src.game import (
     switch_player
 )
 
+
 class MinimaxAgent:
     def __init__(self, max_depth=3):
         self.max_depth = max_depth
         self.nodes_visited = 0
+        self.terminal_states = 0
+        self.cutoff_states = 0
 
-    def minimax(self, board, depth, is_maximizing, current_player, max_player):
+    def minimax(
+        self,
+        board,
+        depth,
+        is_maximizing,
+        current_player,
+        max_player
+    ):
         self.nodes_visited += 1
 
-        # Terminal state check for winner
+        # Terminal state check
         winner = get_winner(board, current_player)
+
         if winner is not None:
+            self.terminal_states += 1
+
             if winner == max_player:
                 return 1000 + depth, None
             else:
@@ -25,11 +38,15 @@ class MinimaxAgent:
 
         # Depth limit cutoff
         if depth == 0:
+            self.cutoff_states += 1
             return evaluate_board(board, max_player), None
 
         legal_turns = get_all_legal_turns(board, current_player)
-        # Terminal state check for no legal moves (stalemate/loss)
+
+        # Backup terminal check in case no legal turns exist
         if not legal_turns:
+            self.terminal_states += 1
+
             if current_player == max_player:
                 return -1000 - depth, None
             else:
@@ -38,9 +55,11 @@ class MinimaxAgent:
         best_turn = legal_turns[0]
 
         if is_maximizing:
-            max_eval = float('-inf')
+            max_eval = float("-inf")
+
             for turn in legal_turns:
                 next_board = apply_turn(board, turn)
+
                 eval_score, _ = self.minimax(
                     next_board,
                     depth - 1,
@@ -48,14 +67,19 @@ class MinimaxAgent:
                     switch_player(current_player),
                     max_player
                 )
+
                 if eval_score > max_eval:
                     max_eval = eval_score
                     best_turn = turn
+
             return max_eval, best_turn
+
         else:
-            min_eval = float('inf')
+            min_eval = float("inf")
+
             for turn in legal_turns:
                 next_board = apply_turn(board, turn)
+
                 eval_score, _ = self.minimax(
                     next_board,
                     depth - 1,
@@ -63,14 +87,19 @@ class MinimaxAgent:
                     switch_player(current_player),
                     max_player
                 )
+
                 if eval_score < min_eval:
                     min_eval = eval_score
                     best_turn = turn
+
             return min_eval, best_turn
 
     def get_best_turn(self, board, current_player):
-        # Entry point called by main to get the best move and metrics
+        # Reset metrics for each search
         self.nodes_visited = 0
+        self.terminal_states = 0
+        self.cutoff_states = 0
+
         start_time = time.time()
 
         eval_score, best_turn = self.minimax(
@@ -82,19 +111,25 @@ class MinimaxAgent:
         )
 
         elapsed_time = time.time() - start_time
+
         metrics = {
             "nodes_visited": self.nodes_visited,
+            "terminal_states": self.terminal_states,
+            "cutoff_states": self.cutoff_states,
             "pruned_branches": 0,
             "decision_time": round(elapsed_time, 4),
             "eval_value": eval_score
         }
+
         return best_turn, metrics
+
 
 if __name__ == "__main__":
     from src.game import create_board
 
     board = create_board()
     agent = MinimaxAgent(max_depth=3)
+
     turn, stats = agent.get_best_turn(board, "black")
 
     print("Minimax Testing:")
